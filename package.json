@@ -1,0 +1,17 @@
+{
+  "name": "beta-desktop",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview",
+    "tauri": "tauri"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "2.0.0-rc.16",
+    "typescript": "^5.3.3",
+    "vite": "^4.5.1"
+  }
+}

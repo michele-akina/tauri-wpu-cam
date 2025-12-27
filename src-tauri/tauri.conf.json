@@ -1,0 +1,37 @@
+{
+    "build": {
+        "beforeDevCommand": "yarn dev",
+        "beforeBuildCommand": "yarn build",
+        "devUrl": "http://localhost:1420",
+        "frontendDist": "../dist"
+    },
+    "identifier": "com.tauri.alpha",
+    "bundle": {
+        "active": false,
+        "targets": "all",
+        "icon": [
+            "icons/32x32.png",
+            "icons/128x128.png",
+            "icons/128x128@2x.png",
+            "icons/icon.icns",
+            "icons/icon.ico"
+        ]
+    },
+    "app": {
+        "macOSPrivateApi": true,
+        "withGlobalTauri": true,
+        "windows": [
+            {
+                "fullscreen": false,
+                "resizable": true,
+                "title": "Tauri WGPU Camera Demo",
+                "width": 640,
+                "height": 360,
+                "decorations": true,
+                "transparent": true,
+                "hiddenTitle": false
+            }
+        ],
+        "security": {}
+    }
+}
