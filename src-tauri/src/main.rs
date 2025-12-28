@@ -5,12 +5,148 @@ mod utils;
 mod webgpu;
 
 use nokhwa::Buffer;
-use std::{sync::Arc, time::Instant};
+use std::sync::atomic::{AtomicBool, Ordering};
+
+use std::{sync::Arc, sync::Mutex, time::Instant};
 use tauri::window::WindowBuilder;
 use tauri::{
-    async_runtime, Manager, PhysicalPosition, PhysicalSize, RunEvent, Window, WindowEvent,
+    async_runtime, Manager, PhysicalPosition, PhysicalSize, RunEvent, State, Window, WindowEvent,
 };
 use webgpu::{CameraSettingsUniform, WgpuState};
+
+/// Render mode for the camera
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RenderMode {
+    /// Camera renders in a small overlay window (thumbnail in corner)
+    Thumbnail,
+    /// Camera renders fullscreen behind the main window's WebView
+    Background,
+}
+
+/// Application state for managing render mode
+pub struct AppState {
+    /// Current render mode (true = Background, false = Thumbnail)
+    pub is_background_mode: AtomicBool,
+    /// Flag to pause rendering during surface switch
+    pub render_paused: AtomicBool,
+    /// Flag to indicate a switch is in progress (for debouncing)
+    pub switch_in_progress: AtomicBool,
+}
+
+impl Default for AppState {
+    fn default() -> Self {
+        Self {
+            is_background_mode: AtomicBool::new(false), // Start in Thumbnail mode
+            render_paused: AtomicBool::new(false),
+            switch_in_progress: AtomicBool::new(false),
+        }
+    }
+}
+
+/// Toggle between Thumbnail and Background camera modes
+#[tauri::command]
+fn toggle_camera_mode(
+    app_handle: tauri::AppHandle,
+    app_state: State<'_, Arc<AppState>>,
+    wgpu_state: State<'_, Arc<WgpuState>>,
+) -> bool {
+    // Debounce: ignore if a switch is already in progress
+    if app_state.switch_in_progress.swap(true, Ordering::SeqCst) {
+        return app_state.is_background_mode.load(Ordering::SeqCst);
+    }
+
+    // Toggle the mode
+    let current = app_state.is_background_mode.load(Ordering::SeqCst);
+    let new_mode = !current;
+    app_state
+        .is_background_mode
+        .store(new_mode, Ordering::SeqCst);
+
+    // Pause rendering during surface switch to avoid race conditions
+    app_state.render_paused.store(true, Ordering::SeqCst);
+
+    // Brief delay to ensure render loop has seen the pause flag
+    std::thread::sleep(std::time::Duration::from_millis(10));
+
+    // Update window transparency BEFORE switching surface
+    if let Some(main_window) = app_handle.get_webview_window("main") {
+        #[cfg(target_os = "macos")]
+        {
+            use objc2_app_kit::{NSColor, NSView};
+            use objc2_foundation::MainThreadMarker;
+
+            // Set the main window's background transparency
+            if let Ok(ns_view_ptr) = main_window.ns_view() {
+                unsafe {
+                    let ns_view: &NSView = &*(ns_view_ptr as *const NSView);
+
+                    if let Some(window) = ns_view.window() {
+                        if new_mode {
+                            // Background mode: make window transparent
+                            window.setOpaque(false);
+                            if let Some(_mtm) = MainThreadMarker::new() {
+                                window.setBackgroundColor(Some(&NSColor::clearColor()));
+                            }
+                        } else {
+                            // Thumbnail mode: make window opaque
+                            window.setOpaque(true);
+                            if let Some(_mtm) = MainThreadMarker::new() {
+                                window.setBackgroundColor(Some(&NSColor::windowBackgroundColor()));
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // Switch the wgpu surface (must happen on main thread for Metal)
+    if new_mode {
+        // Background mode: close overlay first, then switch to main window
+        // Close the overlay window
+        if let Some(overlay_window) = app_handle.get_window("camera-overlay") {
+            let _ = overlay_window.close();
+        }
+
+        // Switch to main window and restore focus
+        if let Some(main_window) = app_handle.get_window("main") {
+            println!("Switching to background mode (main window)");
+            wgpu_state.switch_surface(main_window.clone());
+
+            // Restore focus to main window after closing overlay
+            let _ = main_window.set_focus();
+        }
+    } else {
+        // Thumbnail mode: recreate overlay window and switch to it
+        if let Some(main_window) = app_handle.get_window("main") {
+            println!("Switching to thumbnail mode (overlay window)");
+            let overlay_window = create_overlay_window(&app_handle, &main_window);
+
+            // Sync position with main window
+            if let Some(main_webview_window) = app_handle.get_webview_window("main") {
+                sync_overlay_with_main(&main_webview_window, &overlay_window, &wgpu_state);
+            }
+
+            wgpu_state.switch_surface(overlay_window);
+
+            // Restore focus to main window after creating overlay
+            let _ = main_window.set_focus();
+        }
+    }
+
+    // Resume rendering and allow new switches
+    app_state.render_paused.store(false, Ordering::SeqCst);
+    app_state.switch_in_progress.store(false, Ordering::SeqCst);
+
+    // Return the new mode (true = Background, false = Thumbnail)
+    new_mode
+}
+
+/// Get the current camera mode
+#[tauri::command]
+fn get_camera_mode(app_state: State<'_, Arc<AppState>>) -> bool {
+    app_state.is_background_mode.load(Ordering::SeqCst)
+}
 
 // Camera overlay configuration constants
 const CAMERA_SIZE_FRACTION: f32 = 0.4; // Camera takes up 40% of main window width
@@ -38,6 +174,62 @@ fn calculate_overlay_geometry(
     )
 }
 
+/// Create the camera overlay window
+fn create_overlay_window(app: &tauri::AppHandle, main_window: &Window) -> Window {
+    let main_webview_window = app.get_webview_window("main").unwrap();
+    let main_outer_pos = main_webview_window.outer_position().unwrap();
+    let main_inner_size = main_webview_window.inner_size().unwrap();
+    let (overlay_pos, overlay_size) =
+        calculate_overlay_geometry(main_outer_pos, main_inner_size, 16.0 / 9.0);
+
+    let overlay_window = WindowBuilder::new(app, "camera-overlay")
+        .title("")
+        .inner_size(overlay_size.width as f64, overlay_size.height as f64)
+        .position(overlay_pos.x as f64, overlay_pos.y as f64)
+        .decorations(false)
+        .transparent(true)
+        .always_on_top(true)
+        .visible(false)
+        .skip_taskbar(true)
+        .resizable(false)
+        .shadow(false)
+        .parent(main_window)
+        .expect("Failed to set parent window")
+        .build()
+        .expect("Failed to create overlay window");
+
+    // Give macOS time to initialize the Metal layer
+    std::thread::sleep(std::time::Duration::from_millis(200));
+
+    // Make overlay click-through, non-focusable, and set corner radius on macOS
+    #[cfg(target_os = "macos")]
+    {
+        use objc2_app_kit::{NSFloatingWindowLevel, NSView};
+
+        let _ = overlay_window.set_ignore_cursor_events(true);
+
+        if let Ok(ns_view_ptr) = overlay_window.ns_view() {
+            unsafe {
+                let ns_view: &NSView = &*(ns_view_ptr as *const NSView);
+                ns_view.setWantsLayer(true);
+
+                if let Some(layer) = ns_view.layer() {
+                    layer.setCornerRadius(CAMERA_CORNER_RADIUS_PX);
+                    layer.setMasksToBounds(true);
+                    layer.setBorderWidth(0.0);
+                }
+
+                if let Some(window) = ns_view.window() {
+                    window.setLevel(NSFloatingWindowLevel);
+                }
+            }
+        }
+    }
+
+    overlay_window.show().unwrap();
+    overlay_window
+}
+
 /// Sync overlay window position and size with main window
 fn sync_overlay_with_main(
     main_window: &tauri::WebviewWindow,
@@ -48,10 +240,12 @@ fn sync_overlay_with_main(
         (main_window.outer_position(), main_window.inner_size())
     {
         if let Ok(overlay_size) = overlay_window.inner_size() {
+            // Preserve the current camera aspect ratio
             let camera_aspect = overlay_size.width as f32 / overlay_size.height.max(1) as f32;
             let (overlay_pos, new_overlay_size) =
                 calculate_overlay_geometry(main_outer_pos, main_inner_size, camera_aspect);
 
+            // Always update position (this is only called on window move/resize events, not every frame)
             let _ = overlay_window.set_position(overlay_pos);
 
             // Only resize if size changed
@@ -77,6 +271,10 @@ fn sync_overlay_with_main(
 fn main() {
     tauri::Builder::default()
         .setup(|app| {
+            // Initialize application state
+            let app_state = Arc::new(AppState::default());
+            app.manage(app_state);
+
             // Get the main window (as WebviewWindow for webview operations, and as Window for parenting)
             let main_webview_window = app.get_webview_window("main").unwrap();
             main_webview_window.show().unwrap();
@@ -84,65 +282,12 @@ fn main() {
             // Get the same window as a Window type for use as parent
             let main_window = app.get_window("main").unwrap();
 
-            // Create the overlay window programmatically (without webview)
-            let main_outer_pos = main_webview_window.outer_position().unwrap();
-            let main_inner_size = main_webview_window.inner_size().unwrap();
-            let (overlay_pos, overlay_size) =
-                calculate_overlay_geometry(main_outer_pos, main_inner_size, 16.0 / 9.0);
-
-            let overlay_window = WindowBuilder::new(app, "camera-overlay")
-                .title("")
-                .inner_size(overlay_size.width as f64, overlay_size.height as f64)
-                .position(overlay_pos.x as f64, overlay_pos.y as f64)
-                .decorations(false)
-                .transparent(true)
-                .always_on_top(true)
-                .visible(false)
-                .skip_taskbar(true)
-                .resizable(false)
-                .shadow(false) // No window shadow
-                .parent(&main_window) // Child window moves with parent automatically
-                .expect("Failed to set parent window")
-                .build()
-                .expect("Failed to create overlay window");
-
-            // Give macOS time to initialize the Metal layer
-            std::thread::sleep(std::time::Duration::from_millis(200));
-
-            // Make overlay click-through and set corner radius on macOS
-            #[cfg(target_os = "macos")]
-            {
-                use objc2_app_kit::NSView;
-
-                let _ = overlay_window.set_ignore_cursor_events(true);
-
-                // Get the NSView and set corner radius with masksToBounds on its layer
-                if let Ok(ns_view_ptr) = overlay_window.ns_view() {
-                    unsafe {
-                        let ns_view: &NSView = &*(ns_view_ptr as *const NSView);
-
-                        // Ensure the view has a layer
-                        ns_view.setWantsLayer(true);
-
-                        if let Some(layer) = ns_view.layer() {
-                            layer.setCornerRadius(CAMERA_CORNER_RADIUS_PX);
-                            layer.setMasksToBounds(true);
-                            layer.setBorderWidth(0.0); // No border
-                        }
-                    }
-                }
-            }
-
-            // Show overlay after setup
-            overlay_window.show().unwrap();
+            // Create the overlay window using the helper function
+            let overlay_window = create_overlay_window(&app.app_handle(), &main_window);
 
             // Create WgpuState for the overlay window
             let wgpu_state = async_runtime::block_on(WgpuState::new(overlay_window.clone()));
             app.manage(Arc::new(wgpu_state));
-
-            // Store references for the render loop
-            let main_window_clone = main_webview_window.clone();
-            let overlay_window_clone = overlay_window.clone();
 
             // Create a channel for sending/receiving buffers from the camera
             let (tx, rx) = std::sync::mpsc::channel::<Buffer>();
@@ -172,67 +317,50 @@ fn main() {
             // Render loop
             async_runtime::spawn(async move {
                 let wgpu_state = app_handle.state::<Arc<WgpuState>>();
+                let app_state = app_handle.state::<Arc<AppState>>();
 
                 while let Ok(buffer) = rx.recv() {
                     let _t = Instant::now();
+
+                    // Skip rendering if paused (during surface switch)
+                    if app_state.render_paused.load(Ordering::SeqCst) {
+                        continue;
+                    }
 
                     // Check if we need to reconfigure the surface
                     {
                         let mut needs_reconfigure = wgpu_state.needs_reconfigure.lock().unwrap();
                         if *needs_reconfigure {
                             let config = wgpu_state.config.read().unwrap();
-                            wgpu_state.surface.configure(&wgpu_state.device, &config);
+                            let surface = wgpu_state.surface.read().unwrap();
+                            surface.configure(&wgpu_state.device, &config);
                             *needs_reconfigure = false;
-                            drop(config);
                         }
-                        drop(needs_reconfigure);
                     }
 
                     let width = buffer.resolution().width();
                     let height = buffer.resolution().height();
-                    let camera_aspect = width as f32 / height as f32;
                     let bytes =
                         utils::yuyv_to_rgba(buffer.buffer(), width as usize, height as usize);
 
-                    // Update overlay position and size based on main window
-                    if let (Ok(main_outer_pos), Ok(main_inner_size)) = (
-                        main_window_clone.outer_position(),
-                        main_window_clone.inner_size(),
-                    ) {
-                        let (overlay_pos, overlay_size) = calculate_overlay_geometry(
-                            main_outer_pos,
-                            main_inner_size,
-                            camera_aspect,
-                        );
+                    // Calculate aspect-ratio-preserving camera settings
+                    let camera_aspect = width as f32 / height as f32;
+                    let config = wgpu_state.config.read().unwrap();
+                    let window_aspect = config.width as f32 / config.height as f32;
+                    drop(config);
 
-                        // Update overlay window position
-                        let _ = overlay_window_clone.set_position(overlay_pos);
+                    // Calculate size that maintains camera aspect ratio
+                    let (size_x, size_y) = if camera_aspect > window_aspect {
+                        // Camera is wider than window - fit to width, letterbox top/bottom
+                        (2.0, 2.0 / camera_aspect * window_aspect)
+                    } else {
+                        // Camera is taller than window - fit to height, pillarbox left/right
+                        (2.0 * camera_aspect / window_aspect, 2.0)
+                    };
 
-                        // Check if size changed and update surface config
-                        let current_size =
-                            overlay_window_clone.inner_size().unwrap_or(overlay_size);
-                        if current_size.width != overlay_size.width
-                            || current_size.height != overlay_size.height
-                        {
-                            let _ = overlay_window_clone.set_size(overlay_size);
-
-                            // Update wgpu surface config
-                            let mut config = wgpu_state.config.write().unwrap();
-                            config.width = overlay_size.width.max(1);
-                            config.height = overlay_size.height.max(1);
-                            drop(config);
-
-                            let mut needs_reconfigure =
-                                wgpu_state.needs_reconfigure.lock().unwrap();
-                            *needs_reconfigure = true;
-                            drop(needs_reconfigure);
-                        }
-                    }
-
-                    // Camera settings - render fullscreen within the overlay
                     let camera_settings = CameraSettingsUniform {
-                        position: [0.0, 0.0], // Centered in overlay
-                        size: [2.0, 2.0],     // Fill entire overlay (NDC from -1 to 1)
+                        position: [0.0, 0.0],   // Centered
+                        size: [size_x, size_y], // Maintain aspect ratio
                         _padding: [0.0, 0.0, 0.0, 0.0],
                     };
                     wgpu_state.update_camera_settings(&camera_settings);
@@ -292,16 +420,16 @@ fn main() {
                             });
 
                     // Attempt to get the surface texture
-                    let output = match wgpu_state.surface.get_current_texture() {
+                    let surface = wgpu_state.surface.read().unwrap();
+                    let output = match surface.get_current_texture() {
                         Ok(output) => output,
                         Err(wgpu::SurfaceError::Outdated | wgpu::SurfaceError::Lost) => {
                             println!("Surface outdated or lost, reconfiguring...");
 
                             let config = wgpu_state.config.read().unwrap();
-                            wgpu_state.surface.configure(&wgpu_state.device, &config);
-                            drop(config);
+                            surface.configure(&wgpu_state.device, &config);
 
-                            match wgpu_state.surface.get_current_texture() {
+                            match surface.get_current_texture() {
                                 Ok(output) => output,
                                 Err(e) => {
                                     eprintln!("Failed to acquire texture after reconfigure: {}", e);
@@ -314,6 +442,7 @@ fn main() {
                             continue;
                         }
                     };
+                    drop(surface);
 
                     let view = output
                         .texture
@@ -360,7 +489,10 @@ fn main() {
 
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![])
+        .invoke_handler(tauri::generate_handler![
+            toggle_camera_mode,
+            get_camera_mode
+        ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")
         .run(|app_handle, event| {
@@ -401,18 +533,7 @@ fn main() {
                         let _ = overlay_window.close();
                     }
                 }
-                RunEvent::WindowEvent {
-                    label,
-                    event: WindowEvent::Focused(focused),
-                    ..
-                } if label == "main" => {
-                    // When main window gains focus, ensure overlay is visible
-                    if let Some(overlay_window) = app_handle.get_window("camera-overlay") {
-                        if focused {
-                            let _ = overlay_window.show();
-                        }
-                    }
-                }
+
                 _ => (),
             }
         });

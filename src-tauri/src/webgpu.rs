@@ -28,11 +28,13 @@ impl Default for CameraSettingsUniform {
     }
 }
 
-pub struct WgpuState<'win> {
+pub struct WgpuState {
+    pub instance: wgpu::Instance,
+    pub adapter: wgpu::Adapter,
     pub queue: wgpu::Queue,
     pub device: wgpu::Device,
     pub sampler: wgpu::Sampler,
-    pub surface: wgpu::Surface<'win>,
+    pub surface: RwLock<wgpu::Surface<'static>>,
     pub render_pipeline: wgpu::RenderPipeline,
     pub bind_group_layout: wgpu::BindGroupLayout,
     pub config: RwLock<wgpu::SurfaceConfiguration>,
@@ -42,7 +44,7 @@ pub struct WgpuState<'win> {
     pub camera_settings_bind_group: wgpu::BindGroup,
 }
 
-impl WgpuState<'_> {
+impl WgpuState {
     pub async fn new(window: Window) -> Self {
         let size = window.inner_size().unwrap();
         let instance = wgpu::Instance::default();
@@ -186,9 +188,11 @@ impl WgpuState<'_> {
         surface.configure(&device, &config);
 
         Self {
+            instance,
+            adapter,
             device,
             queue,
-            surface,
+            surface: RwLock::new(surface),
             render_pipeline,
             config: RwLock::new(config),
             sampler,
@@ -197,6 +201,42 @@ impl WgpuState<'_> {
             camera_settings_buffer,
             camera_settings_bind_group,
         }
+    }
+
+    /// Switch the render surface to a different window
+    pub fn switch_surface(&self, window: Window) {
+        let size = window
+            .inner_size()
+            .unwrap_or(tauri::PhysicalSize::new(640, 480));
+
+        // Create new surface for the target window
+        let new_surface = self.instance.create_surface(window).unwrap();
+
+        // Get capabilities and configure
+        let swapchain_capabilities = new_surface.get_capabilities(&self.adapter);
+        let swapchain_format = swapchain_capabilities.formats[0];
+
+        let new_config = wgpu::SurfaceConfiguration {
+            width: size.width.max(1),
+            height: size.height.max(1),
+            format: swapchain_format,
+            usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
+            present_mode: wgpu::PresentMode::Fifo,
+            alpha_mode: swapchain_capabilities.alpha_modes[0],
+            view_formats: vec![],
+            desired_maximum_frame_latency: 2,
+        };
+
+        new_surface.configure(&self.device, &new_config);
+
+        // Update the surface and config
+        let mut surface = self.surface.write().unwrap();
+        *surface = new_surface;
+        drop(surface);
+
+        let mut config = self.config.write().unwrap();
+        *config = new_config;
+        drop(config);
     }
 
     /// Update camera settings uniform buffer

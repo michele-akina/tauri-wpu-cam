@@ -24,7 +24,8 @@ bytemuck = { version = "1.14", features = ["derive"] }
 
 [target.'cfg(target_os = "macos")'.dependencies]
 objc2 = "0.6"
-objc2-app-kit = { version = "0.3", features = ["NSView", "NSWindow"] }
+objc2-foundation = "0.3"
+objc2-app-kit = { version = "0.3", features = ["NSView", "NSWindow", "NSColor"] }
 objc2-quartz-core = { version = "0.3", features = ["CALayer"] }
 
 [features]
