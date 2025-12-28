@@ -25,7 +25,7 @@
                 "label": "main",
                 "fullscreen": false,
                 "resizable": true,
-                "title": "Tauri WGPU Camera Demo",
+                "title": "",
                 "width": 640,
                 "height": 360,
                 "decorations": true,

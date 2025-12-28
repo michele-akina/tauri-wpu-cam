@@ -120,6 +120,40 @@ fn toggle_camera_mode(
         // Thumbnail mode: recreate overlay window and switch to it
         if let Some(main_window) = app_handle.get_window("main") {
             println!("Switching to thumbnail mode (overlay window)");
+
+            // Clear the main window surface before switching away
+            {
+                let surface = wgpu_state.surface.read().unwrap();
+                if let Ok(output) = surface.get_current_texture() {
+                    let view = output
+                        .texture
+                        .create_view(&wgpu::TextureViewDescriptor::default());
+                    let mut encoder = wgpu_state
+                        .device
+                        .create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None });
+                    {
+                        let _rpass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                            label: None,
+                            color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                                view: &view,
+                                resolve_target: None,
+                                ops: wgpu::Operations {
+                                    load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
+                                    store: wgpu::StoreOp::Store,
+                                },
+                                depth_slice: None,
+                            })],
+                            depth_stencil_attachment: None,
+                            timestamp_writes: None,
+                            occlusion_query_set: None,
+                            multiview_mask: None,
+                        });
+                    }
+                    wgpu_state.queue.submit(Some(encoder.finish()));
+                    output.present();
+                }
+            }
+
             let overlay_window = create_overlay_window(&app_handle, &main_window);
 
             // Sync position with main window
@@ -198,13 +232,10 @@ fn create_overlay_window(app: &tauri::AppHandle, main_window: &Window) -> Window
         .build()
         .expect("Failed to create overlay window");
 
-    // Give macOS time to initialize the Metal layer
-    std::thread::sleep(std::time::Duration::from_millis(200));
-
     // Make overlay click-through, non-focusable, and set corner radius on macOS
     #[cfg(target_os = "macos")]
     {
-        use objc2_app_kit::{NSFloatingWindowLevel, NSView};
+        use objc2_app_kit::NSView;
 
         let _ = overlay_window.set_ignore_cursor_events(true);
 
@@ -217,10 +248,6 @@ fn create_overlay_window(app: &tauri::AppHandle, main_window: &Window) -> Window
                     layer.setCornerRadius(CAMERA_CORNER_RADIUS_PX);
                     layer.setMasksToBounds(true);
                     layer.setBorderWidth(0.0);
-                }
-
-                if let Some(window) = ns_view.window() {
-                    window.setLevel(NSFloatingWindowLevel);
                 }
             }
         }
@@ -277,6 +304,22 @@ fn main() {
 
             // Get the main window (as WebviewWindow for webview operations, and as Window for parenting)
             let main_webview_window = app.get_webview_window("main").unwrap();
+
+            // Make the title bar transparent on macOS
+            #[cfg(target_os = "macos")]
+            {
+                use objc2_app_kit::NSView;
+
+                if let Ok(ns_view_ptr) = main_webview_window.ns_view() {
+                    unsafe {
+                        let ns_view: &NSView = &*(ns_view_ptr as *const NSView);
+                        if let Some(window) = ns_view.window() {
+                            window.setTitlebarAppearsTransparent(true);
+                        }
+                    }
+                }
+            }
+
             main_webview_window.show().unwrap();
 
             // Get the same window as a Window type for use as parent

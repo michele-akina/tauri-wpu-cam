@@ -3,7 +3,6 @@
     <head>
         <meta charset="UTF-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-        <title>Tauri WGPU Camera</title>
         <style>
             * {
                 margin: 0;
@@ -29,6 +28,16 @@
             }
             body.transparent {
                 background: transparent !important;
+            }
+            .titlebar {
+                position: fixed;
+                top: 0;
+                left: 0;
+                right: 0;
+                height: 40px;
+                background: transparent;
+                -webkit-app-region: drag;
+                z-index: 99;
             }
             .controls {
                 position: fixed;
@@ -70,9 +79,9 @@
         </style>
     </head>
     <body>
+        <div class="titlebar" data-tauri-drag-region></div>
         <div class="content">
-            <h1>Camera Demo</h1>
-            <p>Click the button below to toggle camera mode</p>
+            <h1>WGPU Camera Demo</h1>
         </div>
         <div class="controls">
             <button id="toggle-mode">Switch to Background Mode</button>
