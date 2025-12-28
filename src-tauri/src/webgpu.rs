@@ -203,7 +203,6 @@ impl WgpuState {
         }
     }
 
-    /// Switch the render surface to a different window
     pub fn switch_surface(&self, window: Window) {
         let size = window
             .inner_size()
@@ -239,7 +238,6 @@ impl WgpuState {
         drop(config);
     }
 
-    /// Update camera settings uniform buffer
     pub fn update_camera_settings(&self, settings: &CameraSettingsUniform) {
         self.queue.write_buffer(
             &self.camera_settings_buffer,
