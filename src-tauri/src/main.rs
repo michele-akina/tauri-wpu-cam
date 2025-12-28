@@ -223,7 +223,7 @@ fn create_overlay_window(app: &tauri::AppHandle, main_window: &Window) -> Window
         .decorations(false)
         .transparent(true)
         .always_on_top(true)
-        .visible(false)
+        .visible(true)
         .skip_taskbar(true)
         .resizable(false)
         .shadow(false)
@@ -254,6 +254,10 @@ fn create_overlay_window(app: &tauri::AppHandle, main_window: &Window) -> Window
     }
 
     overlay_window.show().unwrap();
+    // Re-apply size and position after show() to force macOS compositor to display the window
+    let _ = overlay_window.set_size(overlay_size);
+    let _ = overlay_window.set_position(overlay_pos);
+
     overlay_window
 }
 
@@ -330,11 +334,11 @@ fn main() {
 
             // Create WgpuState for the overlay window
             let wgpu_state = async_runtime::block_on(WgpuState::new(overlay_window.clone()));
+
             app.manage(Arc::new(wgpu_state));
 
             // Create a channel for sending/receiving buffers from the camera
             let (tx, rx) = std::sync::mpsc::channel::<Buffer>();
-
             let app_handle = app.app_handle().clone();
 
             // Spawn a thread for the camera
@@ -342,8 +346,6 @@ fn main() {
                 let mut camera = utils::create_camera();
 
                 camera.open_stream().expect("Could not open stream");
-
-                std::thread::sleep(std::time::Duration::from_secs(1));
 
                 for _i in 0..1000 {
                     let buffer = camera.frame().expect("Could not get frame");
