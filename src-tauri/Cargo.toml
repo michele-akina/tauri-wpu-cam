@@ -13,7 +13,7 @@ edition = "2021"
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
-tauri = { version = "2", features = ["macos-private-api"] }
+tauri = { version = "2", features = ["macos-private-api", "unstable"] }
 nokhwa = { version = "0.10", features = [
   "input-native",
   "output-threaded",
@@ -22,21 +22,15 @@ wgpu = "28"
 rayon = "1"
 bytemuck = { version = "1.14", features = ["derive"] }
 
+[target.'cfg(target_os = "macos")'.dependencies]
+objc2 = "0.6"
+objc2-app-kit = { version = "0.3", features = ["NSView", "NSWindow"] }
+objc2-quartz-core = { version = "0.3", features = ["CALayer"] }
+
 [features]
 # this feature is used for production builds or when `devPath` points to the filesystem
 # DO NOT REMOVE!!
 custom-protocol = ["tauri/custom-protocol"]
-
-
-[profile.dev]
-codegen-units = 1 # Allows LLVM to perform better optimization.
-lto = true # Enables link-time-optimizations.
-opt-level = 3 # Prioritizes small binary size. Use `3` if you prefer speed.
-panic = "abort" # Higher performance by disabling panic handlers.
-strip = true # Ensures debug symbols are removed.
-
-[profile.dev.package."*"]
-opt-level = 1  # Fully optimize dependencies even in dev mode
 
 [profile.release]
 codegen-units = 1 # Allows LLVM to perform better optimization.

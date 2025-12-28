@@ -1,6 +1,6 @@
 use std::sync::Mutex;
 use std::sync::RwLock;
-use tauri::WebviewWindow;
+use tauri::Window;
 use wgpu::util::DeviceExt;
 
 /// Camera settings uniform buffer data
@@ -12,26 +12,18 @@ pub struct CameraSettingsUniform {
     pub position: [f32; 2],
     /// Size of the camera quad in NDC space (0 to 2)
     pub size: [f32; 2],
-    /// Corner radius in normalized quad space (0 to 0.5)
-    pub corner_radius: f32,
-    /// Aspect ratio of the quad (width/height) for circular corners
-    pub aspect_ratio: f32,
     /// Padding to align to 16 bytes
-    pub _padding: [f32; 2],
+    pub _padding: [f32; 4],
 }
 
 impl Default for CameraSettingsUniform {
     fn default() -> Self {
         Self {
-            // Top-right corner position (center of the camera quad)
-            position: [0.65, 0.65],
-            // Size in NDC (width=0.6, height=0.6 of the screen)
-            size: [0.6, 0.6],
-            // Corner radius (relative to quad size, 0.1 = nice rounded corners)
-            corner_radius: 0.08,
-            // Will be calculated based on actual dimensions
-            aspect_ratio: 1.0,
-            _padding: [0.0, 0.0],
+            // Centered
+            position: [0.0, 0.0],
+            // Fill entire window (NDC from -1 to 1)
+            size: [2.0, 2.0],
+            _padding: [0.0, 0.0, 0.0, 0.0],
         }
     }
 }
@@ -51,7 +43,7 @@ pub struct WgpuState<'win> {
 }
 
 impl WgpuState<'_> {
-    pub async fn new(window: WebviewWindow) -> Self {
+    pub async fn new(window: Window) -> Self {
         let size = window.inner_size().unwrap();
         let instance = wgpu::Instance::default();
         let surface = instance.create_surface(window).unwrap();

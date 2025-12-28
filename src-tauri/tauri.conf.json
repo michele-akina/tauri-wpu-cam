@@ -22,13 +22,14 @@
         "withGlobalTauri": true,
         "windows": [
             {
+                "label": "main",
                 "fullscreen": false,
                 "resizable": true,
                 "title": "Tauri WGPU Camera Demo",
                 "width": 640,
                 "height": 360,
                 "decorations": true,
-                "transparent": true,
+                "transparent": false,
                 "hiddenTitle": false
             }
         ],
