@@ -7,7 +7,7 @@ mod webgpu;
 use nokhwa::Buffer;
 use std::sync::atomic::{AtomicBool, Ordering};
 
-use std::{sync::Arc, sync::Mutex, time::Instant};
+use std::{sync::Arc, time::Instant};
 use tauri::window::WindowBuilder;
 use tauri::{
     async_runtime, Manager, PhysicalPosition, PhysicalSize, RunEvent, State, Window, WindowEvent,
