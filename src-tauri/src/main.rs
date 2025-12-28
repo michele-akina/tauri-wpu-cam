@@ -42,13 +42,12 @@ fn main() {
 
                 std::thread::sleep(std::time::Duration::from_secs(1));
 
-                for i in 0..1000 {
+                for _i in 0..1000 {
                     let buffer = camera.frame().expect("Could not get frame");
                     if tx.send(buffer).is_err() {
                         println!("Render loop closed, stopping camera");
                         break;
                     }
-                    println!("Frame {i} sent");
                 }
 
                 camera.stop_stream().expect("Could not stop stream");
@@ -66,18 +65,16 @@ fn main() {
                             let config = wgpu_state.config.read().unwrap();
                             wgpu_state.surface.configure(&wgpu_state.device, &config);
                             *needs_reconfigure = false;
-                            println!("Surface reconfigured to {}x{}", config.width, config.height);
                             drop(config);
                         }
                         drop(needs_reconfigure);
                     }
 
-                    let t = Instant::now();
+                    let _t = Instant::now();
                     let width = buffer.resolution().width();
                     let height = buffer.resolution().height();
                     let bytes =
                         utils::yuyv_to_rgba(buffer.buffer(), width as usize, height as usize);
-                    println!("Decoding took: {}ms", t.elapsed().as_millis());
 
                     // Update camera settings based on current window size
                     {
@@ -171,10 +168,7 @@ fn main() {
 
                     // Attempt to get the surface texture
                     let output = match wgpu_state.surface.get_current_texture() {
-                        Ok(output) => {
-                            println!("Successfully acquired surface texture");
-                            output
-                        }
+                        Ok(output) => output,
                         Err(wgpu::SurfaceError::Outdated | wgpu::SurfaceError::Lost) => {
                             println!("Surface outdated or lost, reconfiguring...");
 
@@ -234,8 +228,6 @@ fn main() {
 
                     wgpu_state.queue.submit(Some(encoder.finish()));
                     output.present();
-
-                    println!("Frame rendered in: {}ms", t.elapsed().as_millis());
                 }
 
                 println!("Render loop ended");
@@ -268,8 +260,6 @@ fn main() {
                     let mut needs_reconfigure = wgpu_state.needs_reconfigure.lock().unwrap();
                     *needs_reconfigure = true;
                     drop(needs_reconfigure);
-
-                    println!("Resize requested to {}x{}", size.width, size.height);
                 }
                 _ => (),
             }
