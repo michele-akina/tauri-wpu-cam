@@ -14,18 +14,14 @@ use tauri::{
 };
 use webgpu::{CameraSettingsUniform, WgpuState};
 
-/// Render mode for the camera
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RenderMode {
-    /// Camera renders in a small overlay window (thumbnail in corner)
     Thumbnail,
-    /// Camera renders fullscreen behind the main window's WebView
     Background,
 }
 
 /// Application state for managing render mode
 pub struct AppState {
-    /// Current render mode (true = Background, false = Thumbnail)
     pub is_background_mode: AtomicBool,
     /// Flag to pause rendering during surface switch
     pub render_paused: AtomicBool,
@@ -177,7 +173,6 @@ const CAMERA_SIZE_FRACTION: f32 = 0.4; // Camera takes up 40% of main window wid
 const CAMERA_MARGIN_PX: i32 = 20; // Margin from edges in pixels
 const CAMERA_CORNER_RADIUS_PX: f64 = 12.0; // Corner radius in pixels for window styling
 
-/// Calculate the overlay window size and position based on main window
 fn calculate_overlay_geometry(
     main_outer_pos: PhysicalPosition<i32>,
     main_inner_size: PhysicalSize<u32>,
@@ -198,7 +193,6 @@ fn calculate_overlay_geometry(
     )
 }
 
-/// Create the camera overlay window
 fn create_overlay_window(app: &tauri::AppHandle, main_window: &Window) -> Window {
     let main_webview_window = app.get_webview_window("main").unwrap();
     let main_outer_pos = main_webview_window.outer_position().unwrap();
@@ -251,7 +245,6 @@ fn create_overlay_window(app: &tauri::AppHandle, main_window: &Window) -> Window
     overlay_window
 }
 
-/// Sync overlay window position and size with main window
 fn sync_overlay_with_main(
     main_window: &tauri::WebviewWindow,
     overlay_window: &Window,
@@ -316,13 +309,9 @@ fn main() {
 
             main_webview_window.show().unwrap();
 
-            // Get the same window as a Window type for use as parent
             let main_window = app.get_window("main").unwrap();
 
-            // Create the overlay window using the helper function
             let overlay_window = create_overlay_window(&app.app_handle(), &main_window);
-
-            // Create WgpuState for the overlay window
             let wgpu_state = async_runtime::block_on(WgpuState::new(overlay_window.clone()));
 
             app.manage(Arc::new(wgpu_state));
@@ -357,7 +346,6 @@ fn main() {
                 while let Ok(buffer) = rx.recv() {
                     let _t = Instant::now();
 
-                    // Skip rendering if paused (during surface switch)
                     if app_state.render_paused.load(Ordering::SeqCst) {
                         continue;
                     }
@@ -518,8 +506,6 @@ fn main() {
                     wgpu_state.queue.submit(Some(encoder.finish()));
                     output.present();
                 }
-
-                println!("Render loop ended");
             });
 
             Ok(())
