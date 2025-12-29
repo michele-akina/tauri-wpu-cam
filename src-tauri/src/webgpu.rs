@@ -3,7 +3,6 @@ use std::sync::RwLock;
 use tauri::Window;
 use wgpu::util::DeviceExt;
 
-/// Camera settings uniform buffer data
 /// Must match the WGSL struct layout exactly
 #[repr(C)]
 #[derive(Debug, Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
