@@ -29,8 +29,6 @@ pub struct AppState {
     pub is_background_mode: AtomicBool,
     /// Flag to pause rendering during surface switch
     pub render_paused: AtomicBool,
-    /// Flag to indicate a switch is in progress (for debouncing)
-    pub switch_in_progress: AtomicBool,
 }
 
 impl Default for AppState {
@@ -38,23 +36,16 @@ impl Default for AppState {
         Self {
             is_background_mode: AtomicBool::new(false), // Start in Thumbnail mode
             render_paused: AtomicBool::new(false),
-            switch_in_progress: AtomicBool::new(false),
         }
     }
 }
 
-/// Toggle between Thumbnail and Background camera modes
 #[tauri::command]
 fn toggle_camera_mode(
     app_handle: tauri::AppHandle,
     app_state: State<'_, Arc<AppState>>,
     wgpu_state: State<'_, Arc<WgpuState>>,
 ) -> bool {
-    // Debounce: ignore if a switch is already in progress
-    if app_state.switch_in_progress.swap(true, Ordering::SeqCst) {
-        return app_state.is_background_mode.load(Ordering::SeqCst);
-    }
-
     // Toggle the mode
     let current = app_state.is_background_mode.load(Ordering::SeqCst);
     let new_mode = !current;
@@ -170,7 +161,6 @@ fn toggle_camera_mode(
 
     // Resume rendering and allow new switches
     app_state.render_paused.store(false, Ordering::SeqCst);
-    app_state.switch_in_progress.store(false, Ordering::SeqCst);
 
     // Return the new mode (true = Background, false = Thumbnail)
     new_mode
