@@ -51,9 +51,6 @@ pub fn app_setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>>
 
     // Create a channel for sending/receiving buffers from the camera
     let (tx, rx) = flume::unbounded::<Buffer>();
-    let app_handle = app.app_handle().clone();
-
-    // Spawn a thread for the camera
     async_runtime::spawn(async move {
         let mut camera = camera::create_camera();
 
@@ -70,6 +67,7 @@ pub fn app_setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>>
     });
 
     // Render loop
+    let app_handle = app.app_handle().clone();
     async_runtime::spawn(async move {
         let wgpu_state = app_handle.state::<Arc<WgpuState>>();
         let app_state = app_handle.state::<Arc<AppState>>();
