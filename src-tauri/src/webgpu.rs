@@ -3,7 +3,6 @@ use std::sync::RwLock;
 use tauri::Window;
 use wgpu::util::DeviceExt;
 
-/// Must match the WGSL struct layout exactly
 #[repr(C)]
 #[derive(Debug, Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
 pub struct CameraSettingsUniform {
@@ -20,7 +19,7 @@ impl Default for CameraSettingsUniform {
         Self {
             // Centered
             position: [0.0, 0.0],
-            // Fill entire window (NDC from -1 to 1)
+            // Size of the camera quad in NDC space (0 to 2)
             size: [2.0, 2.0],
             _padding: [0.0, 0.0, 0.0, 0.0],
         }
@@ -38,7 +37,7 @@ pub struct WgpuState {
     pub bind_group_layout: wgpu::BindGroupLayout,
     pub config: RwLock<wgpu::SurfaceConfiguration>,
     pub needs_reconfigure: Mutex<bool>,
-    // Camera settings uniform
+    // Camera settings
     pub camera_settings_buffer: wgpu::Buffer,
     pub camera_settings_bind_group: wgpu::BindGroup,
 }
@@ -64,7 +63,7 @@ impl WgpuState {
                 required_limits: wgpu::Limits::downlevel_webgl2_defaults()
                     .using_resolution(adapter.limits()),
                 experimental_features: wgpu::ExperimentalFeatures::disabled(),
-                memory_hints: wgpu::MemoryHints::default(),
+                memory_hints: wgpu::MemoryHints::Performance,
                 trace: wgpu::Trace::Off,
             })
             .await
@@ -148,7 +147,7 @@ impl WgpuState {
         let swapchain_format = swapchain_capabilities.formats[0];
 
         let render_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-            label: None,
+            label: Some("render_pipeline"),
             layout: Some(&pipeline_layout),
             vertex: wgpu::VertexState {
                 module: &shader,

@@ -42,12 +42,11 @@ fn toggle_camera_mode(
     app_state: State<'_, Arc<AppState>>,
     wgpu_state: State<'_, Arc<WgpuState>>,
 ) -> bool {
-    // Toggle the mode
-    let current = app_state.is_background_mode.load(Ordering::SeqCst);
-    let new_mode = !current;
+    let current_mode = app_state.is_background_mode.load(Ordering::SeqCst);
+    let new_mode_is_background = !current_mode;
     app_state
         .is_background_mode
-        .store(new_mode, Ordering::SeqCst);
+        .store(new_mode_is_background, Ordering::SeqCst);
 
     // Pause rendering during surface switch to avoid race conditions
     app_state.render_paused.store(true, Ordering::SeqCst);
@@ -55,7 +54,9 @@ fn toggle_camera_mode(
     // Brief delay to ensure render loop has seen the pause flag
     std::thread::sleep(std::time::Duration::from_millis(10));
 
-    // Update window transparency BEFORE switching surface
+    // In background mode, the main window needs to be transparent
+    // In thumbnail mode, the main window needs to be opaque
+    // set_main_window_background_transparency
     if let Some(main_window) = app_handle.get_webview_window("main") {
         #[cfg(target_os = "macos")]
         {
@@ -68,14 +69,14 @@ fn toggle_camera_mode(
                     let ns_view: &NSView = &*(ns_view_ptr as *const NSView);
 
                     if let Some(window) = ns_view.window() {
-                        if new_mode {
-                            // Background mode: make window transparent
+                        if new_mode_is_background {
+                            // Make main window transparent
                             window.setOpaque(false);
                             if let Some(_mtm) = MainThreadMarker::new() {
                                 window.setBackgroundColor(Some(&NSColor::clearColor()));
                             }
                         } else {
-                            // Thumbnail mode: make window opaque
+                            // Thumbnail mode: make main window opaque
                             window.setOpaque(true);
                             if let Some(_mtm) = MainThreadMarker::new() {
                                 window.setBackgroundColor(Some(&NSColor::windowBackgroundColor()));
@@ -87,8 +88,8 @@ fn toggle_camera_mode(
         }
     }
 
-    // Switch the wgpu surface (must happen on main thread for Metal)
-    if new_mode {
+    // Switch the wgpu surface
+    if new_mode_is_background {
         // Close the overlay window
         if let Some(overlay_window) = app_handle.get_window("camera-overlay") {
             let _ = overlay_window.close();
@@ -96,10 +97,11 @@ fn toggle_camera_mode(
 
         // Switch to main window and restore focus
         if let Some(main_window) = app_handle.get_window("main") {
-            println!("Switching to background mode (main window)");
             wgpu_state.switch_surface(main_window.clone());
 
-            // Move the Metal layer behind the webview layer so UI elements render on top
+            // This scope covers a weird edge case on MacOs where the Metal layer is not moved to the back
+            // after the very first thumbnail-> background mode switch
+            // move_metal_layer_to_back
             #[cfg(target_os = "macos")]
             {
                 use objc2_app_kit::NSView;
@@ -112,7 +114,6 @@ fn toggle_camera_mode(
                             if let Some(layer) = ns_view.layer() {
                                 if let Some(sublayers) = layer.sublayers() {
                                     // Find the Metal layer (CAMetalLayer) and move it to the back
-                                    // The Metal layer is typically the last one added
                                     let count = sublayers.len();
                                     if count >= 2 {
                                         let metal_layer =
@@ -132,9 +133,8 @@ fn toggle_camera_mode(
     } else {
         // Thumbnail mode: recreate overlay window and switch to it
         if let Some(main_window) = app_handle.get_window("main") {
-            println!("Switching to thumbnail mode (overlay window)");
-
             // Clear the main window surface before switching away
+            // clear_main_window_surface
             {
                 let surface = wgpu_state.surface.read().unwrap();
                 if let Ok(output) = surface.get_current_texture() {
@@ -181,11 +181,10 @@ fn toggle_camera_mode(
         }
     }
 
-    // Resume rendering and allow new switches
+    // Resume rendering
     app_state.render_paused.store(false, Ordering::SeqCst);
 
-    // Return the new mode (true = Background, false = Thumbnail)
-    new_mode
+    new_mode_is_background
 }
 
 /// Get the current camera mode
@@ -195,20 +194,18 @@ fn get_camera_mode(app_state: State<'_, Arc<AppState>>) -> bool {
 }
 
 // Camera overlay configuration constants
-const CAMERA_SIZE_FRACTION: f32 = 0.4; // Camera takes up 40% of main window width
-const CAMERA_MARGIN_PX: i32 = 20; // Margin from edges in pixels
-const CAMERA_CORNER_RADIUS_PX: f64 = 12.0; // Corner radius in pixels for window styling
+const CAMERA_SIZE_FRACTION: f32 = 0.4;
+const CAMERA_MARGIN_PX: i32 = 20;
+const CAMERA_CORNER_RADIUS_PX: f64 = 12.0;
 
 fn calculate_overlay_geometry(
     main_outer_pos: PhysicalPosition<i32>,
     main_inner_size: PhysicalSize<u32>,
     camera_aspect: f32,
 ) -> (PhysicalPosition<i32>, PhysicalSize<u32>) {
-    // Calculate overlay size based on main window width
     let overlay_width = (main_inner_size.width as f32 * CAMERA_SIZE_FRACTION) as u32;
     let overlay_height = (overlay_width as f32 / camera_aspect) as u32;
 
-    // Position in top-right corner of main window
     let overlay_x =
         main_outer_pos.x + main_inner_size.width as i32 - overlay_width as i32 - CAMERA_MARGIN_PX;
     let overlay_y = main_outer_pos.y + CAMERA_MARGIN_PX;
@@ -226,6 +223,7 @@ fn create_overlay_window(app: &tauri::AppHandle, main_window: &Window) -> Window
     let (overlay_pos, overlay_size) =
         calculate_overlay_geometry(main_outer_pos, main_inner_size, 16.0 / 9.0);
 
+    // create_child_window
     let overlay_window = WindowBuilder::new(app, "camera-overlay")
         .title("")
         .inner_size(overlay_size.width as f64, overlay_size.height as f64)
@@ -243,6 +241,7 @@ fn create_overlay_window(app: &tauri::AppHandle, main_window: &Window) -> Window
         .expect("Failed to create overlay window");
 
     // Make overlay click-through, non-focusable, and set corner radius on macOS
+    // style_child_window
     #[cfg(target_os = "macos")]
     {
         use objc2_app_kit::NSView;
@@ -264,6 +263,7 @@ fn create_overlay_window(app: &tauri::AppHandle, main_window: &Window) -> Window
     }
 
     overlay_window.show().unwrap();
+
     // Re-apply size and position after show() to force macOS compositor to display the window
     let _ = overlay_window.set_size(overlay_size);
     let _ = overlay_window.set_position(overlay_pos);
@@ -310,15 +310,15 @@ fn sync_overlay_with_main(
 
 fn main() {
     tauri::Builder::default()
+        // Move all to app_setup
         .setup(|app| {
-            // Initialize application state
             let app_state = Arc::new(AppState::default());
             app.manage(app_state);
 
-            // Get the main window (as WebviewWindow for webview operations, and as Window for parenting)
             let main_webview_window = app.get_webview_window("main").unwrap();
 
             // Make the title bar transparent on macOS
+            // style_title_bar
             #[cfg(target_os = "macos")]
             {
                 use objc2_app_kit::NSView;
@@ -336,13 +336,13 @@ fn main() {
             main_webview_window.show().unwrap();
 
             let main_window = app.get_window("main").unwrap();
-
             let overlay_window = create_overlay_window(&app.app_handle(), &main_window);
-            let wgpu_state = async_runtime::block_on(WgpuState::new(overlay_window.clone()));
 
+            let wgpu_state = async_runtime::block_on(WgpuState::new(overlay_window.clone()));
             app.manage(Arc::new(wgpu_state));
 
             // Create a channel for sending/receiving buffers from the camera
+            // switch to flume
             let (tx, rx) = std::sync::mpsc::channel::<Buffer>();
             let app_handle = app.app_handle().clone();
 
@@ -361,7 +361,6 @@ fn main() {
                 }
 
                 camera.stop_stream().expect("Could not stop stream");
-                println!("Camera Stream Stopped");
             });
 
             // Render loop
@@ -377,6 +376,7 @@ fn main() {
                     }
 
                     // Check if we need to reconfigure the surface
+                    // reconfigure_surface
                     {
                         let mut needs_reconfigure = wgpu_state.needs_reconfigure.lock().unwrap();
                         if *needs_reconfigure {
@@ -389,6 +389,9 @@ fn main() {
 
                     let width = buffer.resolution().width();
                     let height = buffer.resolution().height();
+
+                    // TODO: this is fast enough (approx 1ms with aggresive compile optimizations)
+                    // but might be worth checking if it can be done with a compute shader
                     let bytes =
                         utils::yuyv_to_rgba(buffer.buffer(), width as usize, height as usize);
 
@@ -473,20 +476,21 @@ fn main() {
                     let output = match surface.get_current_texture() {
                         Ok(output) => output,
                         Err(wgpu::SurfaceError::Outdated | wgpu::SurfaceError::Lost) => {
-                            println!("Surface outdated or lost, reconfiguring...");
-
+                            // Outdated surface, reconfigure it
                             let config = wgpu_state.config.read().unwrap();
                             surface.configure(&wgpu_state.device, &config);
 
                             match surface.get_current_texture() {
                                 Ok(output) => output,
                                 Err(e) => {
+                                    // Replace with anyhow
                                     eprintln!("Failed to acquire texture after reconfigure: {}", e);
                                     continue;
                                 }
                             }
                         }
                         Err(e) => {
+                            // Replace with anyhow
                             eprintln!("Failed to acquire next swap chain texture: {}", e);
                             continue;
                         }
