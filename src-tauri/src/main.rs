@@ -89,7 +89,6 @@ fn toggle_camera_mode(
 
     // Switch the wgpu surface (must happen on main thread for Metal)
     if new_mode {
-        // Background mode: close overlay first, then switch to main window
         // Close the overlay window
         if let Some(overlay_window) = app_handle.get_window("camera-overlay") {
             let _ = overlay_window.close();
@@ -99,6 +98,33 @@ fn toggle_camera_mode(
         if let Some(main_window) = app_handle.get_window("main") {
             println!("Switching to background mode (main window)");
             wgpu_state.switch_surface(main_window.clone());
+
+            // Move the Metal layer behind the webview layer so UI elements render on top
+            #[cfg(target_os = "macos")]
+            {
+                use objc2_app_kit::NSView;
+                use objc2_foundation::NSArray;
+
+                if let Some(main_webview_window) = app_handle.get_webview_window("main") {
+                    if let Ok(ns_view_ptr) = main_webview_window.ns_view() {
+                        unsafe {
+                            let ns_view: &NSView = &*(ns_view_ptr as *const NSView);
+                            if let Some(layer) = ns_view.layer() {
+                                if let Some(sublayers) = layer.sublayers() {
+                                    // Find the Metal layer (CAMetalLayer) and move it to the back
+                                    // The Metal layer is typically the last one added
+                                    let count = sublayers.len();
+                                    if count >= 2 {
+                                        let metal_layer =
+                                            NSArray::objectAtIndex(&sublayers, count - 1);
+                                        metal_layer.setZPosition(-1.0);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
 
             // Restore focus to main window after closing overlay
             let _ = main_window.set_focus();
