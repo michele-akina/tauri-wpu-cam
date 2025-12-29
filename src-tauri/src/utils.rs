@@ -1,24 +1,7 @@
-use nokhwa::pixel_format::RgbAFormat;
-use nokhwa::utils::{RequestedFormat, RequestedFormatType, Resolution};
-use nokhwa::{native_api_backend, query, Camera};
-
 use rayon::prelude::*;
 
-pub fn create_camera() -> Camera {
-    let backend = native_api_backend().expect("Could not get backend");
-    let devices = query(backend).expect("Could not query backend");
-    let device = devices.first().expect("No devices found");
-
-    let format =
-        RequestedFormat::new::<RgbAFormat>(RequestedFormatType::HighestResolution(Resolution {
-            width_x: 1280,
-            height_y: 720,
-        }));
-
-    Camera::new(device.index().to_owned(), format).expect("Could not create camera")
-}
-
-/// HIGH PERFORMANCE DECODING
+// TODO: this is fast enough (approx 1ms for an 1280x720 frame, with aggresive compile-time optimizations)
+// but might be worth checking if it can be done with a compute shader
 pub fn yuyv_to_rgba(yuyv: &[u8], width: usize, height: usize) -> Vec<u8> {
     let pixel_count = width * height;
     let mut rgba = vec![0u8; pixel_count * 4];
