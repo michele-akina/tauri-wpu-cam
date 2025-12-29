@@ -21,6 +21,7 @@ nokhwa = { version = "0.10", features = [
 wgpu = "28"
 rayon = "1"
 bytemuck = { version = "1.14", features = ["derive"] }
+flume = "0.11.1"
 
 [target.'cfg(target_os = "macos")'.dependencies]
 objc2 = "0.6"

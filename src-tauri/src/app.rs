@@ -15,8 +15,22 @@ pub struct AppState {
 impl Default for AppState {
     fn default() -> Self {
         Self {
-            is_background_mode: AtomicBool::new(false), // Start in Thumbnail mode
+            is_background_mode: AtomicBool::new(false),
             render_paused: AtomicBool::new(false),
+        }
+    }
+}
+
+#[cfg(target_os = "macos")]
+fn style_title_bar(main_webview_window: &tauri::WebviewWindow) {
+    use objc2_app_kit::NSView;
+
+    if let Ok(ns_view_ptr) = main_webview_window.ns_view() {
+        unsafe {
+            let ns_view: &NSView = &*(ns_view_ptr as *const NSView);
+            if let Some(window) = ns_view.window() {
+                window.setTitlebarAppearsTransparent(true);
+            }
         }
     }
 }
@@ -26,23 +40,7 @@ pub fn app_setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>>
     app.manage(app_state);
 
     let main_webview_window = app.get_webview_window("main").unwrap();
-
-    // Make the title bar transparent on macOS
-    // style_title_bar
-    #[cfg(target_os = "macos")]
-    {
-        use objc2_app_kit::NSView;
-
-        if let Ok(ns_view_ptr) = main_webview_window.ns_view() {
-            unsafe {
-                let ns_view: &NSView = &*(ns_view_ptr as *const NSView);
-                if let Some(window) = ns_view.window() {
-                    window.setTitlebarAppearsTransparent(true);
-                }
-            }
-        }
-    }
-
+    style_title_bar(&main_webview_window);
     main_webview_window.show().unwrap();
 
     let main_window = app.get_window("main").unwrap();
@@ -52,8 +50,7 @@ pub fn app_setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>>
     app.manage(Arc::new(wgpu_state));
 
     // Create a channel for sending/receiving buffers from the camera
-    // switch to flume
-    let (tx, rx) = std::sync::mpsc::channel::<Buffer>();
+    let (tx, rx) = flume::unbounded::<Buffer>();
     let app_handle = app.app_handle().clone();
 
     // Spawn a thread for the camera
@@ -65,7 +62,6 @@ pub fn app_setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>>
         for _i in 0..1000 {
             let buffer = camera.frame().expect("Could not get frame");
             if tx.send(buffer).is_err() {
-                println!("Render loop closed, stopping camera");
                 break;
             }
         }
@@ -86,7 +82,6 @@ pub fn app_setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>>
             }
 
             // Check if we need to reconfigure the surface
-            // reconfigure_surface
             {
                 let mut needs_reconfigure = wgpu_state.needs_reconfigure.lock().unwrap();
                 if *needs_reconfigure {
@@ -108,18 +103,17 @@ pub fn app_setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>>
             let window_aspect = config.width as f32 / config.height as f32;
             drop(config);
 
-            // Calculate size that maintains camera aspect ratio
             let (size_x, size_y) = if camera_aspect > window_aspect {
-                // Camera is wider than window - fit to width, letterbox top/bottom
+                // Camera is wider than window - fit to width
                 (2.0, 2.0 / camera_aspect * window_aspect)
             } else {
-                // Camera is taller than window - fit to height, pillarbox left/right
+                // Camera is taller than window - fit to height
                 (2.0 * camera_aspect / window_aspect, 2.0)
             };
 
             let camera_settings = CameraSettingsUniform {
-                position: [0.0, 0.0],   // Centered
-                size: [size_x, size_y], // Maintain aspect ratio
+                position: [0.0, 0.0],
+                size: [size_x, size_y],
                 _padding: [0.0, 0.0, 0.0, 0.0],
             };
             wgpu_state.update_camera_settings(&camera_settings);
@@ -186,16 +180,12 @@ pub fn app_setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>>
 
                     match surface.get_current_texture() {
                         Ok(output) => output,
-                        Err(e) => {
-                            // Replace with anyhow
-                            eprintln!("Failed to acquire texture after reconfigure: {}", e);
+                        Err(_e) => {
                             continue;
                         }
                     }
                 }
-                Err(e) => {
-                    // Replace with anyhow
-                    eprintln!("Failed to acquire next swap chain texture: {}", e);
+                Err(_e) => {
                     continue;
                 }
             };

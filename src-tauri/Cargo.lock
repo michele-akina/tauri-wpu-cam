@@ -120,6 +120,7 @@ name = "beta-desktop"
 version = "0.0.0"
 dependencies = [
  "bytemuck",
+ "flume",
  "nokhwa",
  "objc2",
  "objc2-app-kit",
