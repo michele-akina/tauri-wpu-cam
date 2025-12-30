@@ -21,7 +21,7 @@ pub fn create_camera() -> Camera {
 
 // TODO: this is fast enough (run `make bench`)
 // but might be worth checking if it can be done with a compute shader
-// alternatively, we could use ffmpeg but it's a big dependency
+// alternatively, we could also use ffmpeg but it's a big dependency
 pub fn yuyv_to_rgba(yuyv: &[u8], width: usize, height: usize) -> Vec<u8> {
     let pixel_count = width * height;
     let mut rgba = vec![0u8; pixel_count * 4];
@@ -49,7 +49,7 @@ pub fn yuyv_to_rgba(yuyv: &[u8], width: usize, height: usize) -> Vec<u8> {
             chunk[0] = r.clamp(0.0, 255.0) as u8;
             chunk[1] = g.clamp(0.0, 255.0) as u8;
             chunk[2] = b.clamp(0.0, 255.0) as u8;
-            chunk[3] = 255; // Alpha channel (fully opaque)
+            chunk[3] = 255;
         });
 
     rgba

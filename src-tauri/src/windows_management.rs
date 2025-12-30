@@ -91,7 +91,7 @@ pub fn sync_camera_window_with_main(app_handle: &AppHandle, event: RunEvent) {
             if let Some(main_window) = app_handle.get_webview_window("main") {
                 if let Some(overlay_window) = app_handle.get_window("camera-overlay") {
                     let wgpu_state = app_handle.state::<Arc<WgpuState>>();
-                    sync_overlay_with_main(&main_window, &overlay_window, &wgpu_state);
+                    adjust_overlay_geometry(&main_window, &overlay_window, &wgpu_state);
                 }
             }
         }
@@ -104,7 +104,7 @@ pub fn sync_camera_window_with_main(app_handle: &AppHandle, event: RunEvent) {
             if let Some(main_window) = app_handle.get_webview_window("main") {
                 if let Some(overlay_window) = app_handle.get_window("camera-overlay") {
                     let wgpu_state = app_handle.state::<Arc<WgpuState>>();
-                    sync_overlay_with_main(&main_window, &overlay_window, &wgpu_state);
+                    adjust_overlay_geometry(&main_window, &overlay_window, &wgpu_state);
                 }
             }
         }
@@ -123,7 +123,7 @@ pub fn sync_camera_window_with_main(app_handle: &AppHandle, event: RunEvent) {
     }
 }
 
-pub fn sync_overlay_with_main(
+pub fn adjust_overlay_geometry(
     main_window: &tauri::WebviewWindow,
     overlay_window: &Window,
     wgpu_state: &Arc<WgpuState>,

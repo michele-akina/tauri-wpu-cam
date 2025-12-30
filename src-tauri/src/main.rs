@@ -8,6 +8,8 @@ mod webgpu;
 mod windows_management;
 
 fn main() {
+    tracing_subscriber::fmt::init();
+
     tauri::Builder::default()
         .setup(app::app_setup)
         .invoke_handler(tauri::generate_handler![

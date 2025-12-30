@@ -1,4 +1,3 @@
-// Camera settings uniform buffer
 struct CameraSettings {
     // Position of the camera quad center in NDC space (-1 to 1)
     position: vec2<f32>,

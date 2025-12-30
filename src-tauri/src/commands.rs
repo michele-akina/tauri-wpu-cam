@@ -59,7 +59,7 @@ pub fn toggle_camera_mode(
             let overlay_window =
                 windows_management::create_overlay_window(&app_handle, &main_window);
             if let Some(main_webview_window) = app_handle.get_webview_window("main") {
-                windows_management::sync_overlay_with_main(
+                windows_management::adjust_overlay_geometry(
                     &main_webview_window,
                     &overlay_window,
                     &wgpu_state,

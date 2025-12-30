@@ -5,6 +5,7 @@ use nokhwa::Buffer;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::{sync::Arc, time::Instant};
 use tauri::{async_runtime, Manager};
+use tracing::debug;
 
 pub struct AppState {
     pub is_background_mode: AtomicBool,
@@ -54,12 +55,11 @@ pub fn app_setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>>
     // Render loop
     let app_handle = app.app_handle().clone();
     async_runtime::spawn(async move {
-        let start_time = Instant::now();
         let wgpu_state = app_handle.state::<Arc<WgpuState>>();
         let app_state = app_handle.state::<Arc<AppState>>();
 
         while let Ok(buffer) = rx.recv() {
-            let _t = Instant::now();
+            let t = Instant::now();
 
             if app_state.render_paused.load(Ordering::SeqCst) {
                 continue;
@@ -211,6 +211,8 @@ pub fn app_setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>>
 
             wgpu_state.queue.submit(Some(encoder.finish()));
             output.present();
+
+            debug!("Frame rendered in {:?}", t.elapsed());
         }
     });
 
