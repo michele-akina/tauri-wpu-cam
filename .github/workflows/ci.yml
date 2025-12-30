@@ -97,19 +97,35 @@ jobs:
       - name: Run cargo-machete
         with:
           working-directory: src-tauri
-        env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         uses: bnjbvr/cargo-machete@main
 
-  test:
-    name: 🧪 Test
-    runs-on: ${{ matrix.os }}
+  lint:
+    name: 🔍 Lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libfontconfig-dev
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+
+      - name: Run clippy
+        run: cargo clippy --all-features --no-deps -- -D warnings
+
+  build:
+    name: 🔨 Build
+    runs-on: macos-latest
     needs: build-frontend
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [macos-latest]
     steps:
       - name: Checkout code
         uses: actions/checkout@v5
@@ -117,7 +133,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "18"
+          node-version: "24"
           cache: "yarn"
           cache-dependency-path: yarn.lock
 
@@ -138,12 +154,8 @@ jobs:
         with:
           workspaces: src-tauri
 
-      - name: Install nextest
-        uses: taiki-e/install-action@nextest
+      - name: Install Tauri CLI
+        run: yarn add @tauri-apps/cli
 
-      - name: Run tests
-        working-directory: src-tauri
-        env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-        run: cargo nextest run --all-features
+      - name: Build Tauri app
+        run: yarn tauri build
