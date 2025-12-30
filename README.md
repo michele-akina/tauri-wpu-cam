@@ -1,9 +1,6 @@
 # Tauri v2 + wgpu + nokhwa
 
-
-
-https://github.com/user-attachments/assets/f47a2cb5-2b04-474a-b706-05744adae437
-
+<img width="1020" height="640" alt="Screenshot 2025-12-30 at 21 26 54" src="https://github.com/user-attachments/assets/b3b2d17b-bd1e-4070-970d-ae6498e61324" />
 
 
 > **Warning**
@@ -36,10 +33,8 @@ make dev
 ```
 
 ## Known Limitations
-
-- macOS camera format reporting can be inconsistent
-- Frame decoding is CPU-based, which may be a performance bottleneck
-- Application architecture could be further refined
+- macOS camera format reporting can be inconsistent with nokhwa (yuyv instead of requested rgba), and the decoding (yuyv_to_rgba) is currently CPU-based, which may be a performance bottleneck (see benchmark)
+- We might lose the camera aspect ratio when resizing the window, but should be an easy fix
 
 Pull requests addressing these issues are welcome.
 
@@ -62,3 +57,4 @@ This project is a fork of [clearlysid/tauri-wgpu-cam](https://github.com/clearly
 - [FabianLars' Tauri + wgpu demo](https://github.com/FabianLars/tauri-v2-wgpu)
 - [wgpu documentation](https://wgpu.rs/)
 - [Learn wgpu tutorial](https://sotrh.github.io/learn-wgpu/)
+
