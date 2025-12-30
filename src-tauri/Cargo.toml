@@ -1,6 +1,6 @@
 [package]
-name = "beta-desktop"
-version = "0.0.0"
+name = "tauri-wgpu"
+version = "0.1.0"
 description = "A Tauri App"
 authors = ["you"]
 license = ""
@@ -12,16 +12,40 @@ edition = "2021"
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
 
+[dev-dependencies]
+criterion = "0.5"
+
 [dependencies]
-tauri = { version = "2", features = ["macos-private-api"] }
+tauri = { version = "2", features = ["macos-private-api", "unstable"] }
 nokhwa = { version = "0.10", features = [
   "input-native",
   "output-threaded",
 ] }
 wgpu = "28"
 rayon = "1"
+bytemuck = { version = "1.14", features = ["derive"] }
+flume = "0.11.1"
+tracing = "0.1"
+tracing-subscriber = "0.3"
+
+[target.'cfg(target_os = "macos")'.dependencies]
+objc2 = "0.6"
+objc2-foundation = "0.3"
+objc2-app-kit = { version = "0.3", features = ["NSView", "NSWindow", "NSColor"] }
+objc2-quartz-core = { version = "0.3", features = ["CALayer"] }
 
 [features]
 # this feature is used for production builds or when `devPath` points to the filesystem
 # DO NOT REMOVE!!
 custom-protocol = ["tauri/custom-protocol"]
+
+[[bench]]
+name = "yuyv_to_rgba_benchmark"
+harness = false
+
+[profile.release]
+codegen-units = 1 # Allows LLVM to perform better optimization.
+lto = true
+opt-level = 3
+panic = "abort" # Higher performance by disabling panic handlers.
+strip = true # Ensures debug symbols are removed.
