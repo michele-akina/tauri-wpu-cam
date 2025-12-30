@@ -4,8 +4,7 @@ struct CameraSettings {
     position: vec2<f32>,
     // Size of the camera quad in NDC space (0 to 2)
     size: vec2<f32>,
-    // Padding to align to 16 bytes
-    _padding: vec4<f32>,
+
 };
 
 @group(0) @binding(0) var my_texture: texture_2d<f32>;

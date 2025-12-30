@@ -1,7 +1,6 @@
 use crate::camera;
-use crate::utils;
 use crate::webgpu::{CameraSettingsUniform, WgpuState};
-use crate::windows;
+use crate::windows_management;
 use nokhwa::Buffer;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::{sync::Arc, time::Instant};
@@ -21,35 +20,21 @@ impl Default for AppState {
     }
 }
 
-#[cfg(target_os = "macos")]
-fn style_title_bar(main_webview_window: &tauri::WebviewWindow) {
-    use objc2_app_kit::NSView;
-
-    if let Ok(ns_view_ptr) = main_webview_window.ns_view() {
-        unsafe {
-            let ns_view: &NSView = &*(ns_view_ptr as *const NSView);
-            if let Some(window) = ns_view.window() {
-                window.setTitlebarAppearsTransparent(true);
-            }
-        }
-    }
-}
-
 pub fn app_setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     let app_state = Arc::new(AppState::default());
     app.manage(app_state);
 
     let main_webview_window = app.get_webview_window("main").unwrap();
-    style_title_bar(&main_webview_window);
+    windows_management::style_title_bar(&main_webview_window);
     main_webview_window.show().unwrap();
 
     let main_window = app.get_window("main").unwrap();
-    let overlay_window = windows::create_overlay_window(app.app_handle(), &main_window);
+    let overlay_window = windows_management::create_overlay_window(app.app_handle(), &main_window);
 
     let wgpu_state = async_runtime::block_on(WgpuState::new(overlay_window.clone()));
     app.manage(Arc::new(wgpu_state));
 
-    // Create a channel for sending/receiving buffers from the camera
+    // Create a channel for camera buffers
     let (tx, rx) = flume::unbounded::<Buffer>();
     async_runtime::spawn(async move {
         let mut camera = camera::create_camera();
@@ -93,7 +78,7 @@ pub fn app_setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>>
             let width = buffer.resolution().width();
             let height = buffer.resolution().height();
 
-            let bytes = utils::yuyv_to_rgba(buffer.buffer(), width as usize, height as usize);
+            let bytes = camera::yuyv_to_rgba(buffer.buffer(), width as usize, height as usize);
 
             // Calculate aspect-ratio-preserving camera settings
             let camera_aspect = width as f32 / height as f32;
@@ -112,7 +97,6 @@ pub fn app_setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>>
             let camera_settings = CameraSettingsUniform {
                 position: [0.0, 0.0],
                 size: [size_x, size_y],
-                _padding: [0.0, 0.0, 0.0, 0.0],
             };
             wgpu_state.update_camera_settings(&camera_settings);
 

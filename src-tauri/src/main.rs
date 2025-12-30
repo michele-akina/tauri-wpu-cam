@@ -4,9 +4,8 @@
 mod app;
 mod camera;
 mod commands;
-mod utils;
 mod webgpu;
-mod windows;
+mod windows_management;
 
 fn main() {
     tauri::Builder::default()
@@ -17,5 +16,5 @@ fn main() {
         ])
         .build(tauri::generate_context!())
         .expect("Error while building tauri application")
-        .run(windows::sync_windows);
+        .run(windows_management::sync_camera_window_with_main);
 }

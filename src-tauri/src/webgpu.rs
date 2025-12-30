@@ -10,8 +10,6 @@ pub struct CameraSettingsUniform {
     pub position: [f32; 2],
     /// Size of the camera quad in NDC space (0 to 2)
     pub size: [f32; 2],
-    /// Padding to align to 16 bytes
-    pub _padding: [f32; 4],
 }
 
 impl Default for CameraSettingsUniform {
@@ -21,7 +19,6 @@ impl Default for CameraSettingsUniform {
             position: [0.0, 0.0],
             // Size of the camera quad in NDC space (0 to 2)
             size: [2.0, 2.0],
-            _padding: [0.0, 0.0, 0.0, 0.0],
         }
     }
 }

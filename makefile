@@ -10,5 +10,10 @@ format:
 	cd src-tauri && \
 	cargo fmt && \
 	cargo fix
+
+bench:
+	cd src-tauri && \
+	cargo bench
+
 dev:
 	yarn run tauri dev

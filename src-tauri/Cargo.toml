@@ -1,5 +1,5 @@
 [package]
-name = "beta-desktop"
+name = "tauri-wgpu"
 version = "0.0.0"
 description = "A Tauri App"
 authors = ["you"]
@@ -11,6 +11,9 @@ edition = "2021"
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
+
+[dev-dependencies]
+criterion = "0.5"
 
 [dependencies]
 tauri = { version = "2", features = ["macos-private-api", "unstable"] }
@@ -33,6 +36,10 @@ objc2-quartz-core = { version = "0.3", features = ["CALayer"] }
 # this feature is used for production builds or when `devPath` points to the filesystem
 # DO NOT REMOVE!!
 custom-protocol = ["tauri/custom-protocol"]
+
+[[bench]]
+name = "yuyv_to_rgba_benchmark"
+harness = false
 
 [profile.release]
 codegen-units = 1 # Allows LLVM to perform better optimization.
