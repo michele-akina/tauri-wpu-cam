@@ -63,7 +63,7 @@ jobs:
         run: yarn run build
 
   detect-unused-dependencies:
-    name: 🧹 Detect unused rust deps
+    name: 🧹 Detect dependencies
     runs-on: ubuntu-latest
     needs: build-frontend
     steps:
