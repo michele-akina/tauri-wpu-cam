@@ -41,14 +41,14 @@ jobs:
         with:
           node-version: "24"
           cache: "yarn"
-          cache-dependency-path: ui/yarn.lock
+          cache-dependency-path: yarn.lock
 
       - name: Cache frontend build
         id: cache-frontend
         uses: actions/cache@v4
         with:
-          path: ui/dist
-          key: frontend-build-${{ hashFiles('ui/package.json', 'ui/yarn.lock', 'ui/**/*.ts', 'ui/**/*.tsx', 'ui/**/*.css', 'ui/**/*.html') }}
+          path: dist
+          key: frontend-build-${{ hashFiles('package.json', 'yarn.lock', 'ui/**/*.ts', '*.html') }}
           restore-keys: |
             frontend-build-
 
@@ -75,13 +75,13 @@ jobs:
         with:
           node-version: "18"
           cache: "yarn"
-          cache-dependency-path: ui/yarn.lock
+          cache-dependency-path: yarn.lock
 
       - name: Restore frontend build
         uses: actions/cache@v4
         with:
-          path: ui/dist
-          key: frontend-build-${{ hashFiles('ui/package.json', 'ui/yarn.lock', 'ui/**/*.ts', 'ui/**/*.tsx', 'ui/**/*.css', 'ui/**/*.html') }}
+          path: dist
+          key: frontend-build-${{ hashFiles('package.json', 'yarn.lock', 'ui/**/*.ts', '*.html') }}
           restore-keys: |
             frontend-build-
           fail-on-cache-miss: true
@@ -119,13 +119,13 @@ jobs:
         with:
           node-version: "18"
           cache: "yarn"
-          cache-dependency-path: ui/yarn.lock
+          cache-dependency-path: yarn.lock
 
       - name: Restore frontend build
         uses: actions/cache@v4
         with:
-          path: ui/dist
-          key: frontend-build-${{ hashFiles('ui/package.json', 'ui/yarn.lock', 'ui/**/*.ts', 'ui/**/*.tsx', 'ui/**/*.css', 'ui/**/*.html') }}
+          path: dist
+          key: frontend-build-${{ hashFiles('package.json', 'yarn.lock', 'ui/**/*.ts', '*.html') }}
           restore-keys: |
             frontend-build-
           fail-on-cache-miss: true

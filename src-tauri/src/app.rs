@@ -34,7 +34,7 @@ pub fn app_setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>>
     let wgpu_state = async_runtime::block_on(WgpuState::new(overlay_window.clone()));
     app.manage(Arc::new(wgpu_state));
 
-    // Create a channel for camera buffers
+    // Camera loop
     let (tx, rx) = flume::unbounded::<Buffer>();
     async_runtime::spawn(async move {
         let mut camera = camera::create_camera();
@@ -54,6 +54,7 @@ pub fn app_setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>>
     // Render loop
     let app_handle = app.app_handle().clone();
     async_runtime::spawn(async move {
+        let start_time = Instant::now();
         let wgpu_state = app_handle.state::<Arc<WgpuState>>();
         let app_state = app_handle.state::<Arc<AppState>>();
 
@@ -156,7 +157,6 @@ pub fn app_setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>>
             let output = match surface.get_current_texture() {
                 Ok(output) => output,
                 Err(wgpu::SurfaceError::Outdated | wgpu::SurfaceError::Lost) => {
-                    // Outdated surface, reconfigure it
                     let config = wgpu_state.config.read().unwrap();
                     surface.configure(&wgpu_state.device, &config);
 
