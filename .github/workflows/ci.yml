@@ -120,6 +120,7 @@ jobs:
         uses: Swatinem/rust-cache@v2
 
       - name: Run clippy
+        working-directory: src-tauri
         run: cargo clippy --all-features --no-deps -- -D warnings
 
   build:
