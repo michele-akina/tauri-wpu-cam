@@ -65,9 +65,26 @@ jobs:
   lint:
     name: 🔍 Lint
     runs-on: macos-latest
+    needs: build-frontend
     steps:
       - name: Checkout code
         uses: actions/checkout@v5
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: "yarn"
+          cache-dependency-path: yarn.lock
+
+      - name: Restore frontend build
+        uses: actions/cache@v4
+        with:
+          path: dist
+          key: frontend-build-${{ hashFiles('package.json', 'yarn.lock', 'ui/**/*.ts', '*.html') }}
+          restore-keys: |
+            frontend-build-
+          fail-on-cache-miss: true
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
