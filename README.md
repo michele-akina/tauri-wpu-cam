@@ -6,7 +6,7 @@
 > **Warning**
 > This project is currently only compatible with **macOS**. Windows and Linux support is not implemented.
 
-A demonstration of efficient camera frame rendering using Tauri v2 combined with wgpu and nokwha. This project renders camera frames directly to native windows using GPU textures, avoiding the overhead of Tauri's IPC or WebSocket approaches. Ideal for applications that require processing of the camera frames in the tuari backend, and use the webview only as a presentation layer. 
+A demonstration of efficient camera frame rendering using Tauri v2 combined with wgpu and nokwha. This project renders camera frames directly to native windows using GPU textures, avoiding the overhead of Tauri's IPC or WebSocket approaches. Ideal for applications that require processing of the camera frames in the Tauri backend before rendering. 
 
 
 ## Rendering Modes
@@ -56,6 +56,7 @@ This project is a fork of [clearlysid/tauri-wgpu-cam](https://github.com/clearly
 - [FabianLars' Tauri + wgpu demo](https://github.com/FabianLars/tauri-v2-wgpu)
 - [wgpu documentation](https://wgpu.rs/)
 - [WebGPU Fundamentals](https://webgpufundamentals.org/)
+
 
 
 
