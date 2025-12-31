@@ -6,12 +6,12 @@
 > **Warning**
 > This project is currently only compatible with **macOS**. Windows and Linux support is not implemented.
 
-A demonstration of efficient camera frame rendering using Tauri v2 combined with WebGPU (wgpu) and the nokhwa camera library. This project renders camera frames directly to native windows using GPU textures, avoiding the overhead of Tauri's IPC or WebSocket approaches.
+A demonstration of efficient camera frame rendering using Tauri v2 combined with wgpu and nokwha. This project renders camera frames directly to native windows using GPU textures, avoiding the overhead of Tauri's IPC or WebSocket approaches.
 
 
 ## Rendering Modes
 
-This fork adds an example of toggling between two camera display modes:
+This is a fork of [clearlysid/tauri-wgpu-cam](https://github.com/clearlysid/tauri-wgpu-cam) and adds an example of toggling between two camera display modes:
 
 - **Thumbnail Mode**: Camera renders in a small overlay window positioned over the main window (default)
 - **Background Mode**: Camera renders as the full background of the main window, with UI elements layered on top
@@ -33,16 +33,14 @@ make dev
 ```
 
 ## Known Limitations
-- macOS camera format reporting can be inconsistent with nokhwa (yuyv instead of requested rgba), and the decoding (yuyv_to_rgba) is currently CPU-based, which may be a performance bottleneck (see benchmark)
-- We might lose the camera aspect ratio when resizing the window, but should be an easy fix
-- Will probably not work on Windows and Linux. Most window operations are down with macOS-specific APIs.
 
-Pull requests addressing these issues are welcome.
+- macOS camera format reporting can be inconsistent with nokhwa (yuyv instead of requested rgba), and the decoding (yuyv_to_rgba) is currently CPU-based, which may be a performance bottleneck (see benchmark)
+- We might lose the camera aspect ratio when resizing the window. Should be an easy fix
+- Will probably not work on Windows and Linux. Most window operations are done with macOS-specific APIs
 
 ## Changes from Original
 
 This fork includes the following updates:
-
 - Updated dependencies, notably wgpu to v28 (includes breaking API changes)
 - Added flume for async channels between camera and render loops
 - Added tracing/tracing-subscriber for structured logging
@@ -57,6 +55,6 @@ This project is a fork of [clearlysid/tauri-wgpu-cam](https://github.com/clearly
 
 - [FabianLars' Tauri + wgpu demo](https://github.com/FabianLars/tauri-v2-wgpu)
 - [wgpu documentation](https://wgpu.rs/)
-- [Learn wgpu tutorial](https://sotrh.github.io/learn-wgpu/)
+- [WebGPU Fundamentals](https://webgpufundamentals.org/)
 
 
