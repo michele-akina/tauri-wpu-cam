@@ -49,26 +49,9 @@ pub fn create_overlay_window(app: &tauri::AppHandle, main_window: &Window) -> Wi
         .build()
         .expect("Failed to create overlay window");
 
-    // Make overlay click-through, non-focusable, and set corner radius on macOS
-    // style_child_window
     #[cfg(target_os = "macos")]
     {
-        use objc2_app_kit::NSView;
-
-        let _ = overlay_window.set_ignore_cursor_events(true);
-
-        if let Ok(ns_view_ptr) = overlay_window.ns_view() {
-            unsafe {
-                let ns_view: &NSView = &*(ns_view_ptr as *const NSView);
-                ns_view.setWantsLayer(true);
-
-                if let Some(layer) = ns_view.layer() {
-                    layer.setCornerRadius(CAMERA_CORNER_RADIUS_PX);
-                    layer.setMasksToBounds(true);
-                    layer.setBorderWidth(0.0);
-                }
-            }
-        }
+        style_child_window(&overlay_window);
     }
 
     overlay_window.show().unwrap();
@@ -78,6 +61,26 @@ pub fn create_overlay_window(app: &tauri::AppHandle, main_window: &Window) -> Wi
     let _ = overlay_window.set_position(overlay_pos);
 
     overlay_window
+}
+
+#[cfg(target_os = "macos")]
+fn style_child_window(window: &Window) {
+    use objc2_app_kit::NSView;
+
+    let _ = window.set_ignore_cursor_events(true);
+
+    if let Ok(ns_view_ptr) = window.ns_view() {
+        unsafe {
+            let ns_view: &NSView = &*(ns_view_ptr as *const NSView);
+            ns_view.setWantsLayer(true);
+
+            if let Some(layer) = ns_view.layer() {
+                layer.setCornerRadius(CAMERA_CORNER_RADIUS_PX);
+                layer.setMasksToBounds(true);
+                layer.setBorderWidth(0.0);
+            }
+        }
+    }
 }
 
 pub fn sync_camera_window_with_main(app_handle: &AppHandle, event: RunEvent) {
