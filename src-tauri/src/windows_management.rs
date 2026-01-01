@@ -7,6 +7,8 @@ const CAMERA_SIZE_FRACTION: f32 = 0.4;
 const CAMERA_MARGIN_PX: i32 = 20;
 const CAMERA_CORNER_RADIUS_PX: f64 = 12.0;
 
+pub const CAMERA_OVERLAY_WINDOW_LABEL: &str = "camera-overlay";
+
 pub fn calculate_overlay_geometry(
     main_outer_pos: PhysicalPosition<i32>,
     main_inner_size: PhysicalSize<u32>,
@@ -33,7 +35,7 @@ pub fn create_overlay_window(app: &tauri::AppHandle, main_window: &Window) -> Wi
         calculate_overlay_geometry(main_outer_pos, main_inner_size, 16.0 / 9.0);
 
     // create_child_window
-    let overlay_window = WindowBuilder::new(app, "camera-overlay")
+    let overlay_window = WindowBuilder::new(app, CAMERA_OVERLAY_WINDOW_LABEL)
         .title("")
         .inner_size(overlay_size.width as f64, overlay_size.height as f64)
         .position(overlay_pos.x as f64, overlay_pos.y as f64)
@@ -92,7 +94,7 @@ pub fn sync_camera_window_with_main(app_handle: &AppHandle, event: RunEvent) {
         } if label == "main" => {
             // When main window moves, update overlay position
             if let Some(main_window) = app_handle.get_webview_window("main") {
-                if let Some(overlay_window) = app_handle.get_window("camera-overlay") {
+                if let Some(overlay_window) = app_handle.get_window(CAMERA_OVERLAY_WINDOW_LABEL) {
                     let wgpu_state = app_handle.state::<Arc<WgpuState>>();
                     adjust_overlay_geometry(&main_window, &overlay_window, &wgpu_state);
                 }
@@ -105,7 +107,7 @@ pub fn sync_camera_window_with_main(app_handle: &AppHandle, event: RunEvent) {
         } if label == "main" => {
             // When main window resizes, update overlay size and position
             if let Some(main_window) = app_handle.get_webview_window("main") {
-                if let Some(overlay_window) = app_handle.get_window("camera-overlay") {
+                if let Some(overlay_window) = app_handle.get_window(CAMERA_OVERLAY_WINDOW_LABEL) {
                     let wgpu_state = app_handle.state::<Arc<WgpuState>>();
                     adjust_overlay_geometry(&main_window, &overlay_window, &wgpu_state);
                 }
@@ -117,7 +119,7 @@ pub fn sync_camera_window_with_main(app_handle: &AppHandle, event: RunEvent) {
             ..
         } if label == "main" => {
             // When main window closes, close overlay too
-            if let Some(overlay_window) = app_handle.get_window("camera-overlay") {
+            if let Some(overlay_window) = app_handle.get_window(CAMERA_OVERLAY_WINDOW_LABEL) {
                 let _ = overlay_window.close();
             }
         }

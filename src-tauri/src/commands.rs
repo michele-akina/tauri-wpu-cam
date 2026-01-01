@@ -32,7 +32,9 @@ pub fn toggle_camera_mode(
         // 1 - Destroy overlay window
         // 2 - Switch wgpu surface
         // 3 - Restore focus to main window
-        if let Some(overlay_window) = app_handle.get_window("camera-overlay") {
+        if let Some(overlay_window) =
+            app_handle.get_window(windows_management::CAMERA_OVERLAY_WINDOW_LABEL)
+        {
             let _ = overlay_window.close();
         }
 
