@@ -1,4 +1,4 @@
-.PHONY:  format lint dev
+.PHONY: format lint dev bench
 
 lint:
 	cd src-tauri && \
