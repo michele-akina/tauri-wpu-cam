@@ -34,7 +34,7 @@ make dev
 
 ## Known Limitations
 
-- macOS camera format reporting can be inconsistent with nokhwa (yuyv instead of requested rgba), and the decoding (yuyv_to_rgba) is currently CPU-based, which may be a performance bottleneck (see benchmark). If you do not need to do further processing on the frame, the smartest thing to do would be to add a compute shader for the conversion in the GPU command buffer, before the rendering. This would reduce CPU->GPU bandwidth (yuyv is smaller than rgba) and speed up the conversion significantly. The conversion is a textbook GPU task as it can be parallelized on each pixel
+- macOS camera format reporting can be inconsistent with nokhwa (yuyv instead of requested rgba), and the decoding (yuyv_to_rgba) is currently CPU-based, which may be a performance bottleneck (see benchmark). If you do not need to do further processing on the frame, the smartest thing to do would be to add a compute shader for the conversion in the GPU command buffer, before the rendering. This would reduce CPU->GPU bandwidth (yuyv is smaller than rgba) and speed up the conversion significantly. The conversion is a textbook GPU task.
 - We might lose the camera aspect ratio when resizing the window. Should be an easy fix
 - Will probably not work on Windows and Linux. Most window operations are done with macOS-specific APIs
 
@@ -56,6 +56,7 @@ This project is a fork of [clearlysid/tauri-wgpu-cam](https://github.com/clearly
 - [FabianLars' Tauri + wgpu demo](https://github.com/FabianLars/tauri-v2-wgpu)
 - [wgpu documentation](https://wgpu.rs/)
 - [WebGPU Fundamentals](https://webgpufundamentals.org/)
+
 
 
 
